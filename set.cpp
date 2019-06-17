@@ -3,3 +3,8 @@
 //
 
 #include "set.hpp"
+#include "counted.hpp"
+
+using container = set<counted>;
+
+#include "test.inl"
