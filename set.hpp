@@ -7,24 +7,24 @@
 #include <utility>
 #include <iterator>
 #include <iostream>
-#include <unordered_set>
+#include <memory>
 
 template<typename>
 class set;
 
 template<typename T>
 struct node {
-    node* left_;
-    node* right_;
+    std::unique_ptr<node> left_;
+    std::unique_ptr<node> right_;
     node* parent_;
     T val_;
 
-    void swap(node& other) {
-        std::swap(left_, other.left_);
-        std::swap(right_, other.right_);
-        std::swap(parent_, other.parent_);
-        std::swap(val_, other.val_);
-    }
+//    void swap(node& other) {
+//        std::swap(left_, other.left_);
+//        std::swap(right_, other.right_);
+//        std::swap(parent_, other.parent_);
+//        std::swap(val_, other.val_);
+//    }
 
     node() = delete;
 
@@ -46,6 +46,7 @@ class set {
     typedef T& reference;
     typedef T const& const_reference;
     typedef T* pointer;
+    typedef std::unique_ptr<node<value_type>> u_ptr;
 
     struct set_iterator {
         typedef T value_type;
@@ -56,8 +57,7 @@ class set {
 
         template<typename> friend
         class set;
-        template<typename> friend
-        class set_const_iterator;
+
 
         set_iterator() = default;
         set_iterator(set_iterator const&) = default;
@@ -113,11 +113,7 @@ class set {
     };
 
   private:
-//    template<typename> friend
-//    class set_iterator;
-    node<value_type>* root = nullptr;
-//    std::unordered_set<node<value_type>*> memory_police;
-//    std::unordered_set<node<value_type>*> delete_police;
+    u_ptr root;
 
     /* find next node or return nullptr */
     template<typename V>
@@ -126,9 +122,9 @@ class set {
             return nullptr;
         }
         if (cur->right_ != nullptr) {
-            cur = cur->right_;
+            cur = cur->right_.get();
             while (cur->left_ != nullptr) {
-                cur = cur->left_;
+                cur = cur->left_.get();
             }
             return cur;
         }
@@ -137,9 +133,9 @@ class set {
         do {
             last = cur;
             cur = cur->parent_;
-        } while (cur->parent_ != nullptr && cur->right_ == last);
+        } while (cur->parent_ != nullptr && cur->right_.get() == last);
 
-        if (cur->right_ != last) {
+        if (cur->right_.get() != last) {
             return cur;
         } else {
             return nullptr;
@@ -153,9 +149,9 @@ class set {
             return nullptr;
         }
         if (cur->left_ != nullptr) {
-            cur = cur->left_;
+            cur = cur->left_.get();
             while (cur->right_ != nullptr) {
-                cur = cur->right_;
+                cur = cur->right_.get();
             }
             return cur;
         }
@@ -164,9 +160,9 @@ class set {
         do {
             last = cur;
             cur = cur->parent_;
-        } while (cur->parent_ != nullptr && cur->left_ == last);
+        } while (cur->parent_ != nullptr && cur->left_.get() == last);
 
-        if (cur->left_ != last) {
+        if (cur->left_.get() != last) {
             return cur;
         } else {
             return nullptr;
@@ -179,23 +175,20 @@ class set {
         if (cpy_node == nullptr) {
             return nullptr;
         }
-        auto* new_root = new node<value_type>(nullptr, nullptr, nullptr, cpy_node->val_);
-        //memory_police.insert(new_root);
-        new_root->left_ = copy_tree_dfs(new_root, cpy_node->left_);
-        new_root->right_ = copy_tree_dfs(new_root, cpy_node->right_);
-        return new_root;
+        u_ptr new_root(new node<value_type>(nullptr, nullptr, nullptr, cpy_node->val_));
+        new_root->left_.reset(copy_tree_dfs(new_root.get(), cpy_node->left_.get()));
+        new_root->right_.reset(copy_tree_dfs(new_root.get(), cpy_node->right_.get()));
+        return new_root.release();
     }
-
 
     node<value_type>* copy_tree_dfs(node<value_type>* last, node<value_type>* cpy_node) {
         if (cpy_node == nullptr) {
             return nullptr;
         }
-        auto* new_v = new node<value_type>(nullptr, nullptr, last, cpy_node->val_);
-        //memory_police.insert(new_v);
-        new_v->left_ = copy_tree_dfs(new_v, cpy_node->left_);
-        new_v->right_ = copy_tree_dfs(new_v, cpy_node->right_);
-        return new_v;
+        u_ptr new_v(new node<value_type>(nullptr, nullptr, last, cpy_node->val_));
+        new_v->left_.reset(copy_tree_dfs(new_v.get(), cpy_node->left_.get()));
+        new_v->right_.reset(copy_tree_dfs(new_v.get(), cpy_node->right_.get()));
+        return new_v.release();
     }
 
     static node<value_type>* find_min(node<value_type>* v) noexcept {
@@ -203,7 +196,7 @@ class set {
             return nullptr;
         } else {
             while (v->left_ != nullptr) {
-                v = v->left_;
+                v = v->left_.get();
             }
             return v;
         }
@@ -214,7 +207,7 @@ class set {
             return nullptr;
         } else {
             while (v->right_ != nullptr) {
-                v = v->right_;
+                v = v->right_.get();
             }
             return v;
         }
@@ -222,188 +215,169 @@ class set {
 
     std::pair<node<value_type>*, bool> insert_(const_reference elem) {
         if (root == nullptr) {
-            root = new node<value_type>(nullptr, nullptr, nullptr, elem);
-            //memory_police.insert(root);
-            return {root, true};
+            root.reset(new node<value_type>(nullptr, nullptr, nullptr, elem));
+            return {root.get(), true};
         }
-        node<value_type>* v = root;
-        node<value_type>* last = root;
+        node<value_type>* v = root.get();
+        node<value_type>* last = root.get();
         while (v != nullptr) {
             if (v->val_ == elem) {
                 return {v, false};
             } else if (v->val_ > elem) {
                 last = v;
-                v = v->left_;
+                v = v->left_.get();
             } else {
                 last = v;
-                v = v->right_;
+                v = v->right_.get();
             }
         }
         if (last->val_ > elem) {
-            last->left_ = new node<value_type>(nullptr, nullptr, last, elem);
-            //memory_police.insert(last->left_);
-            return {last->left_, true};
+            last->left_.reset(new node<value_type>(nullptr, nullptr, last, elem));
+            return {last->left_.get(), true};
         } else {
-            last->right_ = new node<value_type>(nullptr, nullptr, last, elem);
-            //memory_police.insert(last->right_);
-            return {last->right_, true};
+            last->right_.reset(new node<value_type>(nullptr, nullptr, last, elem));
+            return {last->right_.get(), true};
         }
     }
 
     node<value_type>* find_(const_reference elem) const noexcept {
-        node<value_type>* v = root;
+        node<value_type>* v = root.get();
         while (v != nullptr && v->val_ != elem) {
             if (v->val_ > elem) {
-                v = v->left_;
+                v = v->left_.get();
             } else {
-                v = v->right_;
+                v = v->right_.get();
             }
         }
         return v;
     }
 
-    void set_node_as_right_child(node<value_type>* v) {
+    node<value_type>* set_node_as_right_child(node<value_type>* v) {
         if (v->parent_ != nullptr) {
-            if (v->parent_->left_ == v) {
-                v->parent_->left_ = v->right_;
+            if (v->parent_->left_.get() == v) {
+                v = v->parent_->left_.release();
+                v->parent_->left_.reset(v->right_.release());
+                if (v->parent_->left_ != nullptr) {
+                    v->parent_->left_->parent_ = v->parent_;
+                }
             } else {
-                v->parent_->right_ = v->right_;
+                v = v->parent_->right_.release();
+                v->parent_->right_ .reset(v->right_.release());
+                if (v->parent_->right_ != nullptr) {
+                    v->parent_->right_->parent_ = v->parent_;
+                }
             }
         } else {
             throw std::runtime_error("bad node to set as right child");
         }
-        if (v->right_ != nullptr) {
-            v->right_->parent_ = v->parent_;
-        }
+        return v;
     }
 
-    void set_tree_node(node<value_type>* old_node, node<value_type>* new_node) {
+
+    node<value_type>* set_tree_node(node<value_type>* old_node, node<value_type>* new_node) {
         if (old_node->left_ != nullptr) {
             old_node->left_->parent_ = new_node;
         }
         if (old_node->right_ != nullptr) {
             old_node->right_->parent_ = new_node;
         }
-        new_node->left_ = old_node->left_;
-        new_node->right_ = old_node->right_;
+        new_node->left_.reset(old_node->left_.release());
+        new_node->right_.reset(old_node->right_.release());
         if (old_node->parent_ != nullptr) {
-            if (old_node->parent_->left_ == old_node) {
-                old_node->parent_->left_ = new_node;
+            auto* old_parent = old_node->parent_;
+            if (old_node->parent_->left_.get() == old_node) {
+                old_node->parent_->left_.reset(new_node);
             } else {
-                old_node->parent_->right_ = new_node;
-            }
-            new_node->parent_ = old_node->parent_;
+                old_node->parent_->right_.reset(new_node);
+            } // after if old node is deleted
+            new_node->parent_ = old_parent;
         } else {
             new_node->parent_ = nullptr;
-            root = new_node;
+            root.reset(new_node); //delete old node
         }
+        return new_node;
     }
+
 
     node<value_type>* erase_(node<value_type>* del_node) {
         if (del_node == nullptr) {
             return nullptr;
         }
-        node<value_type>* subtree_min = find_min(del_node->right_);
+        node<value_type>* subtree_min = find_min(del_node->right_.get());
         if (subtree_min == nullptr) {
             node<value_type>* next = next_node(del_node);
             if (del_node->parent_ == nullptr) {
-                root = del_node->left_;
+                root.reset(del_node->left_.get()); // delete del_node;
                 if (root != nullptr) {
                     root->parent_ = nullptr;
                 }
-//                if (memory_police.find(del_node) == memory_police.end()) {
-//                    throw std::runtime_error("root bad delete");
-//                } else {
-//                    delete_police.insert(del_node);
-//                    memory_police.erase(del_node);
-//                }
             } else {
-                if (del_node->parent_->left_ == del_node) {
+                if (del_node->parent_->left_.get() == del_node) {
                     if (del_node->left_ == nullptr) {
-                        del_node->parent_->left_ = nullptr;
+                        del_node->parent_->left_.reset(nullptr); // delete del_node
                     } else {
-                        del_node->parent_->left_ = del_node->left_;
                         del_node->left_->parent_ = del_node->parent_;
+                        del_node->parent_->left_.reset(del_node->left_.release()); // delete del_node
                     }
                 } else {
-                    if (del_node->left_ == nullptr) {
+                    if (del_node->left_.get() == nullptr) {
                         del_node->parent_->right_ = nullptr;
                     } else {
-                        del_node->parent_->right_ = del_node->left_;
                         del_node->left_->parent_ = del_node->parent_;
+                        del_node->parent_->right_.reset(del_node->left_.release()); // delete del_node
                     }
                 }
-//                if (memory_police.find(del_node) == memory_police.end()) {
-//                    throw std::runtime_error("root bad delete");
-//                } else {
-//                    delete_police.insert(del_node);
-//                    memory_police.erase(del_node);
-//                }
             }
-            delete del_node;
             return next;
         } else {
-            set_node_as_right_child(subtree_min);
-            set_tree_node(del_node, subtree_min);
-//            if (memory_police.find(del_node) == memory_police.end()) {
-//                throw std::runtime_error("node bad delete");
-//            } else {
-//                delete_police.insert(del_node);
-//                memory_police.erase(del_node);
-//            }
-            delete del_node;
+            // attention unsafe data pointer return
+            subtree_min = set_node_as_right_child(subtree_min);
+            // put subtree min in safety storage and delete del_node
+            subtree_min = set_tree_node(del_node, subtree_min);
             return subtree_min;
         }
     }
 
     node<value_type>* lower_(const_reference elem) const noexcept {
-        node<value_type>* v = root;
+        node<value_type>* v = root.get();
         node<value_type>* res = nullptr;
         while (v != nullptr) {
             if (v->val_ >= elem) {
                 res = v;
-                v = v->left_;
+                v = v->left_.get();
             } else {
-                v = v->right_;
+                v = v->right_.get();
             }
         }
         return res;
     }
 
     node<value_type>* upper_(const_reference elem) const noexcept {
-        node<value_type>* v = root;
+        node<value_type>* v = root.get();
         node<value_type>* res = nullptr;
         while (v != nullptr) {
             if (v->val_ > elem) {
                 res = v;
-                v = v->left_;
+                v = v->left_.get();
             } else {
-                v = v->right_;
+                v = v->right_.get();
             }
         }
         return res;
     }
 
-    void delete_tree(node<value_type>* delete_root) {
-        delete_dfs(delete_root);
-    }
-
-    void delete_dfs(node<value_type>* ptr) {
-        if (ptr == nullptr) {
-            return;
-        }
-        delete_dfs(ptr->left_);
-        delete_dfs(ptr->right_);
-//        if (memory_police.find(ptr) == memory_police.end()) {
-//            if (delete_police.find(ptr) != delete_police.end()) {
-//                throw std::runtime_error("double free");
-//            }
-//            //throw std::runtime_error("dfs bad delete");
-//        } else {
-//            memory_police.erase(ptr);
+//    void delete_tree(node<value_type>* delete_root) {
+//        delete_dfs(delete_root);
+//    }
+//
+//    void delete_dfs(node<value_type>* ptr) {
+//        if (ptr == nullptr) {
+//            return;
 //        }
-        delete ptr;
-    }
+//        delete_dfs(ptr->left_);
+//        delete_dfs(ptr->right_);
+//        delete ptr;
+//    }
 
   public:
     using iterator = set_iterator;
@@ -414,22 +388,16 @@ class set {
     set() noexcept : root(nullptr) {};
 
     set(set const& other) {
-        root = copy_tree(other.root);
+        root.reset(copy_tree(other.root.get()));
     }
     set& operator=(set const& other) {
         set(other).swap(*this);
         return *this;
     }
-    ~set() {
-        clear();
-//        if (!memory_police.empty()) {
-//            throw std::runtime_error("memory leaks");
-//        }
-    }
+    ~set() = default;
 
     void clear() {
-        delete_tree(root);
-        root = nullptr;
+        root.reset(nullptr);
     }
 
     bool empty() const noexcept {
@@ -437,10 +405,10 @@ class set {
     }
 
     const_iterator begin() const {
-        return const_iterator(find_min(root), root);
+        return const_iterator(find_min(root.get()), root.get());
     };
     const_iterator end() const {
-        return const_iterator(nullptr, root);
+        return const_iterator(nullptr, root.get());
     };
 
     const_reverse_iterator rbegin() const {
@@ -451,20 +419,20 @@ class set {
     };
 
     std::pair<iterator, bool> insert(const_reference elem) {
-        std::pair<node<T>*, bool> res = insert_(elem);
-        return {iterator(res.first, root), res.second};
+        std::pair<node<value_type>*, bool> res = insert_(elem);
+        return {iterator(res.first, root.get()), res.second};
     }
     iterator erase(iterator pos) {
-        return iterator(erase_(pos.ptr_), root);
+        return iterator(erase_(pos.ptr_), root.get());
     }
     const_iterator find(const_reference elem) const noexcept {
-        return const_iterator(find_(elem), root);
+        return const_iterator(find_(elem), root.get());
     }
     const_iterator lower_bound(const_reference elem) const noexcept {
-        return const_iterator(lower_(elem), root);
+        return const_iterator(lower_(elem), root.get());
     }
     const_iterator upper_bound(const_reference elem) const noexcept {
-        return const_iterator(upper_(elem), root);
+        return const_iterator(upper_(elem), root.get());
     }
 
     void swap(set& other) {
