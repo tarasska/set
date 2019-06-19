@@ -38,7 +38,6 @@ struct node {
     node operator=(node const&) = delete;
 };
 
-
 template<typename T>
 class set {
   public:
@@ -57,7 +56,6 @@ class set {
 
         template<typename> friend
         class set;
-
 
         set_iterator() = default;
         set_iterator(set_iterator const&) = default;
@@ -240,8 +238,9 @@ class set {
         }
     }
 
-    node<value_type>* find_(const_reference elem) const noexcept {
+    node<value_type>* find_(const_reference elem) const {
         node<value_type>* v = root.get();
+
         while (v != nullptr && v->val_ != elem) {
             if (v->val_ > elem) {
                 v = v->left_.get();
@@ -249,6 +248,7 @@ class set {
                 v = v->right_.get();
             }
         }
+
         return v;
     }
 
@@ -262,7 +262,7 @@ class set {
                 }
             } else {
                 v = v->parent_->right_.release();
-                v->parent_->right_ .reset(v->right_.release());
+                v->parent_->right_.reset(v->right_.release());
                 if (v->parent_->right_ != nullptr) {
                     v->parent_->right_->parent_ = v->parent_;
                 }
@@ -272,7 +272,6 @@ class set {
         }
         return v;
     }
-
 
     node<value_type>* set_tree_node(node<value_type>* old_node, node<value_type>* new_node) {
         if (old_node->left_ != nullptr) {
@@ -298,7 +297,6 @@ class set {
         return new_node;
     }
 
-
     node<value_type>* erase_(node<value_type>* del_node) {
         if (del_node == nullptr) {
             return nullptr;
@@ -317,14 +315,16 @@ class set {
                         del_node->parent_->left_.reset(nullptr); // delete del_node
                     } else {
                         del_node->left_->parent_ = del_node->parent_;
-                        del_node->parent_->left_.reset(del_node->left_.release()); // delete del_node
+                        del_node->parent_->left_
+                            .reset(del_node->left_.release()); // delete del_node
                     }
                 } else {
                     if (del_node->left_.get() == nullptr) {
                         del_node->parent_->right_ = nullptr;
                     } else {
                         del_node->left_->parent_ = del_node->parent_;
-                        del_node->parent_->right_.reset(del_node->left_.release()); // delete del_node
+                        del_node->parent_->right_
+                            .reset(del_node->left_.release()); // delete del_node
                     }
                 }
             }
@@ -425,7 +425,7 @@ class set {
     iterator erase(iterator pos) {
         return iterator(erase_(pos.ptr_), root.get());
     }
-    const_iterator find(const_reference elem) const noexcept {
+    const_iterator find(const_reference elem) const {
         return const_iterator(find_(elem), root.get());
     }
     const_iterator lower_bound(const_reference elem) const noexcept {
