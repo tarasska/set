@@ -366,19 +366,6 @@ class set {
         return res;
     }
 
-//    void delete_tree(node<value_type>* delete_root) {
-//        delete_dfs(delete_root);
-//    }
-//
-//    void delete_dfs(node<value_type>* ptr) {
-//        if (ptr == nullptr) {
-//            return;
-//        }
-//        delete_dfs(ptr->left_);
-//        delete_dfs(ptr->right_);
-//        delete ptr;
-//    }
-
   public:
     using iterator = set_iterator;
     using const_iterator = set_iterator;
